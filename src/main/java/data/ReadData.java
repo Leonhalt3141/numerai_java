@@ -39,6 +39,26 @@ public class ReadData {
         return recordMap;
     }
 
+    private void addStructField(Schema.Field field, List<String> fieldNames, List<StructField> structArray) {
+        String name = field.name();
+
+        fieldNames.add(name);
+
+        DataType dataType;
+
+        if (name.contains("target")) {
+            dataType = DataTypes.DoubleType;
+        } else if (name.contains("feature")) {
+            dataType = DataTypes.DoubleType;
+        } else if (name.contains("era")) {
+            dataType = DataTypes.StringType;
+        } else {
+            dataType = DataTypes.StringType;
+        }
+
+        structArray.add(new StructField(name, dataType));
+    }
+
     public DataFrame convertToDataFrame(List<GenericRecord> recordList) {
         ListIterator<Schema.Field> fieldIter = recordList.get(0).getSchema().getFields().listIterator();
         List<String> fieldNames = new ArrayList<>();
@@ -46,24 +66,7 @@ public class ReadData {
         List<StructField> structArray = new ArrayList<>();
 
         while (fieldIter.hasNext()) {
-            Schema.Field field = fieldIter.next();
-            String name = field.name();
-
-            fieldNames.add(name);
-
-            DataType dataType;
-
-            if (name.contains("target")) {
-                dataType = DataTypes.DoubleType;
-            } else if (name.contains("feature")) {
-                dataType = DataTypes.DoubleType;
-            } else if (name.contains("era")) {
-                dataType = DataTypes.StringType;
-            } else {
-                dataType = DataTypes.StringType;
-            }
-
-            structArray.add(new StructField(name, dataType));
+            addStructField(fieldIter.next(), fieldNames, structArray);
         }
 
         StructType schema = DataTypes.struct(structArray);
