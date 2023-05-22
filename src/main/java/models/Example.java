@@ -4,19 +4,29 @@ import data.*;
 import org.apache.avro.generic.*;
 import org.apache.parquet.hadoop.*;
 import smile.data.DataFrame;
+import smile.data.Tuple;
 import smile.math.*;
 import smile.regression.*;
 import smile.validation.*;
 import smile.data.formula.*;
+import smile.io.Write;
+import smile.io.Read;
+
 import smile.data.type.*;
 import smile.data.formula.Terms.*;
 import ml.dmlc.xgboost4j.java.Booster;
 
 import ml.dmlc.xgboost4j.java.XGBoost;
 
+import scala.collection.Iterator;
+
 import java.io.*;
 import java.util.*;
 import java.util.stream.*;
+import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 
 public class Example {
 
@@ -27,7 +37,8 @@ public class Example {
 
     static String targetVariable = "normed_target";
 
-    static String trainFile = "";
+    static String trainFile = "data/489_v4_1_train.parquet";
+    static String liveFile = "data/489_v4_1_live.parquet";
 
     static ReadData readData = new ReadData();
 
@@ -35,13 +46,92 @@ public class Example {
         try {
             RegressionValidations<GradientTreeBoost> trainedRegressors = train();
 
+            writeModel(trainedRegressors, "GBT_regressor.model");
+
             System.out.println(trainedRegressors);
+
+            DataFrame liveDataFrame = readDataFrame(liveFile);
+
+            double[] predicted = predict(trainedRegressors, liveDataFrame);
+
+            double[][] data = Arrays.stream(predicted)
+                    .boxed()
+                    .toArray(double[][]::new);
+
+            DataFrame predictredDF = liveDataFrame
+                    .select("id")
+                    .merge(
+                            DataFrame.of(data, "prediction")
+                    );
+
+            writeLiveCSV(predictredDF, "live_result.csv");
 
         } catch (IOException e) {
             System.err.println(e.getMessage());
         }
 
     }
+
+    public static void writeModel(RegressionValidations<GradientTreeBoost> regressors, String modelPath) throws IOException {
+        Write.object(regressors, Paths.get(modelPath));
+    }
+    public RegressionValidations<GradientTreeBoost> readModel(String modelPath) throws Exception {
+
+        return (RegressionValidations<GradientTreeBoost>) Read.object(Paths.get(modelPath));
+    }
+
+    public static DataFrame readDataFrame(String parquetPath) throws IOException {
+        ParquetReader<GenericRecord> reader = readData.readAsIterator(parquetPath);
+        List<GenericRecord> recordList = new ArrayList<>();
+
+        GenericRecord row = reader.read();
+
+        while (row != null) {
+            recordList.add(row);
+            row = reader.read();
+        }
+
+        return readData.convertToDataFrame(recordList);
+
+    }
+
+    public static void writeLiveCSV(DataFrame predictedDF, String csvPath) throws IOException {
+        FileWriter csvWriter = new FileWriter(csvPath);
+
+        int dfSize = predictedDF.size();
+
+        for (int i = 0; i < dfSize; i++) {
+            Tuple row = predictedDF.get(i);
+            csvWriter
+                    .append(row.get(0).toString())
+                    .append(",")
+                    .append(row.get(1).toString())
+                    .append("\n");
+        }
+
+        csvWriter.flush();
+        csvWriter.close();
+    }
+
+    public static double[] predict(RegressionValidations<GradientTreeBoost> trainedRegressors, DataFrame dataFrame) {
+        int size = dataFrame.size();
+        double[] results = new double[size];
+
+        for (RegressionValidation<GradientTreeBoost> regressor : trainedRegressors.rounds) {
+            double[] prediction = regressor.model.predict(dataFrame);
+            
+            for (int i = 0; i < size; i++) {
+                results[i] += prediction[i];
+            }
+        }
+
+        for (int i = 0; i < size; i++) {
+            results[i] /= cvSize;
+        }
+
+        return results;
+    }
+
 
     public static int[] slice(int[] array, int startIndex, int endIndex) {
         return Arrays.copyOfRange(array, startIndex, endIndex);
