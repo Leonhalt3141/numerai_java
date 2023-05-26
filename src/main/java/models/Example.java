@@ -38,12 +38,13 @@ public class Example {
     static String targetVariable = "normed_target";
 
     static String trainFile = "data/489_v4_1_train.parquet";
-    static String liveFile = "data/489_v4_1_live.parquet";
+    static String liveFile = "data/493_v4_1_live.parquet";
 
     static ReadData readData = new ReadData();
 
     public static void main(String[] args) {
         try {
+            System.out.println("Start training");
             RegressionValidations<GradientTreeBoost> trainedRegressors = train();
 
             writeModel(trainedRegressors, "GBT_regressor.model");
@@ -150,7 +151,6 @@ public class Example {
                 .boxed().collect(Collectors.toList());
 
         int count = 0;
-//        GenericRecord record;
         List<GenericRecord> recordList = new ArrayList<>();
         ParquetReader<GenericRecord> iter = readData.readAsIterator(trainFile);
 
@@ -182,7 +182,6 @@ public class Example {
 
 //        String[] featureColumnArray = new String[featureColumns.size()];
 //        featureColumnArray = featureColumns.toArray(featureColumnArray);
-
 
         DataFrame selected = trainData
                 .merge(

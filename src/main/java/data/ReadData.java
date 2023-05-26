@@ -1,6 +1,7 @@
 package data;
 
 import org.apache.avro.*;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
 import smile.data.*;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.parquet.avro.*;
@@ -9,6 +10,7 @@ import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.hadoop.fs.Path;
 import smile.data.type.*;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 import java.util.*;
 import java.util.stream.*;
@@ -22,19 +24,19 @@ public class ReadData {
         Path input = new Path(pathStr);
 
         //noinspection deprecation
-        return AvroParquetReader.<GenericRecord>builder(input)
-                        .withConf(conf)
-                        .build();
+        return AvroParquetReader
+                .<GenericRecord>builder(HadoopInputFile.fromPath(input, conf))
+                .withConf(conf)
+                .build();
 
     }
 
     private Map<String, Object> rowToMap(GenericRecord row, List<String> fieldNames) {
         Map<String, Object> recordMap = new HashMap<>();
         for (String name : fieldNames) {
-            Object  value = (row.get(name) == null || !row.hasField(name)) ? null : row.get(name);
-            if (value != null) {
-                recordMap.put(name, value);
-            }
+            Object  value = (!row.hasField(name) || row.get(name) == null) ? Double.NaN : row.get(name);
+
+            recordMap.put(name, value);
         }
         return recordMap;
     }
@@ -60,7 +62,12 @@ public class ReadData {
     }
 
     public DataFrame convertToDataFrame(List<GenericRecord> recordList) {
-        ListIterator<Schema.Field> fieldIter = recordList.get(0).getSchema().getFields().listIterator();
+        ListIterator<Schema.Field> fieldIter = recordList
+                .get(0)
+                .getSchema()
+                .getFields()
+                .listIterator();
+
         List<String> fieldNames = new ArrayList<>();
 
         List<StructField> structArray = new ArrayList<>();
