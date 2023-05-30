@@ -37,8 +37,11 @@ public class Example {
 
     static String targetVariable = "normed_target";
 
-    static String trainFile = "data/489_v4_1_train.parquet";
-    static String liveFile = "data/493_v4_1_live.parquet";
+    static String trainFile = "data/494_v4_1_train.parquet";
+    static String liveFile = "data/494_v4_1_live.parquet";
+
+    static double targetMean;
+    static double targetStd;
 
     static ReadData readData = new ReadData();
 
@@ -46,28 +49,52 @@ public class Example {
         try {
             System.out.println("Start training");
             RegressionValidations<GradientTreeBoost> trainedRegressors = train();
-
+//
             writeModel(trainedRegressors, "GBT_regressor.model");
-
+//            RegressionValidations<GradientTreeBoost> trainedRegressors = readModel("GBT_regressor.model");
             System.out.println(trainedRegressors);
 
             DataFrame liveDataFrame = readDataFrame(liveFile);
 
-            double[] predicted = predict(trainedRegressors, liveDataFrame);
+            List<String> featureColumns = Arrays.stream(liveDataFrame
+                            .schema()
+                            .fields())
+                    .filter(x1 -> x1.name.contains("feature"))
+                    .map(x2 -> x2.name)
+                    .collect(Collectors.toList())
+                    .subList(0, 1205);
+
+            featureColumns.add(targetVariable);
+
+            DataFrame liveDF = liveDataFrame
+                    .merge(
+                            DataFrame.of(
+                                    Arrays.stream(liveDataFrame.column("target").toDoubleArray())
+                                            .boxed()
+                                            .map(value -> normalize(value, targetMean, targetStd))
+                                            .toArray(double[][]::new),
+                                    targetVariable
+                            )
+                    )
+                    .select(featureColumns.toArray(new String[0]));
+
+            double[] predicted = predict(trainedRegressors, liveDF);
 
             double[][] data = Arrays.stream(predicted)
                     .boxed()
+                    .map(value -> new double[]{(value * targetStd) + targetMean})
                     .toArray(double[][]::new);
 
-            DataFrame predictredDF = liveDataFrame
+            DataFrame predictedDF = liveDataFrame
                     .select("id")
                     .merge(
                             DataFrame.of(data, "prediction")
                     );
 
-            writeLiveCSV(predictredDF, "live_result.csv");
+            writeLiveCSV(predictedDF, "live_result.csv");
 
-        } catch (IOException e) {
+        } catch (Exception e) {
+            System.out.println("Failed.");
             System.err.println(e.getMessage());
         }
 
@@ -76,7 +103,8 @@ public class Example {
     public static void writeModel(RegressionValidations<GradientTreeBoost> regressors, String modelPath) throws IOException {
         Write.object(regressors, Paths.get(modelPath));
     }
-    public RegressionValidations<GradientTreeBoost> readModel(String modelPath) throws Exception {
+
+    public static RegressionValidations<GradientTreeBoost> readModel(String modelPath) throws Exception {
 
         return (RegressionValidations<GradientTreeBoost>) Read.object(Paths.get(modelPath));
     }
@@ -122,12 +150,12 @@ public class Example {
             double[] prediction = regressor.model.predict(dataFrame);
             
             for (int i = 0; i < size; i++) {
-                results[i] += prediction[i];
+                results[i] = results[i] + prediction[i];
             }
         }
 
         for (int i = 0; i < size; i++) {
-            results[i] /= cvSize;
+            results[i] = results[i] / (double) cvSize;
         }
 
         return results;
@@ -144,6 +172,7 @@ public class Example {
 
     public static RegressionValidations<GradientTreeBoost> train() throws IOException {
         MathEx.setSeed(19650218);
+        System.out.println("Load data");
 
         int[] permutation = MathEx.permutate(dataSize);
 
@@ -162,13 +191,14 @@ public class Example {
 
             count += 1;
         }
+        System.out.println("recordList: " + recordList.size());
 
         DataFrame trainData = readData.convertToDataFrame(recordList);
 
         double[] targetArray = trainData.column("target").toDoubleArray();
 
-        double mean = MathEx.mean(targetArray);
-        double std = MathEx.mean(targetArray);
+        targetMean = MathEx.mean(targetArray);
+        targetStd = MathEx.sd(targetArray);
 
         List<String> featureColumns = Arrays.stream(trainData
                 .schema()
@@ -188,7 +218,7 @@ public class Example {
                         DataFrame.of(
                                 Arrays.stream(trainData.column("target").toDoubleArray())
                                         .boxed()
-                                        .map(value -> normalize(value, mean, std))
+                                        .map(value -> normalize(value, targetMean, targetStd))
                                         .toArray(double[][]::new),
                                 targetVariable
                         )
@@ -197,12 +227,14 @@ public class Example {
 
         Formula formula = Formula.lhs(targetVariable);
         Properties params = new Properties();
-        params.put("nztree", 2000);
-        params.put("maxDepth", 20);
-        params.put("maxNodes", 15);
-        params.put("nodeSize", 10);
-        params.put("shrinkage", 0.01);
-        params.put("subsample", 0.7);
+        params.put("smile.gradient_boost.trees", 500);
+        params.put("smile.gradient_boost.max_depth", 20);
+        params.put("smile.gradient_boost.max_nodes", 15);
+        params.put("smile.gradient_boost.node_size", 10);
+        params.put("smile.gradient_boost.shrinkage", 0.01);
+        params.put("smile.gradient_boost.sampling_rate", 0.7);
+
+        System.out.println("Train model");
 
         return CrossValidation.regression(
                 cvSize,
