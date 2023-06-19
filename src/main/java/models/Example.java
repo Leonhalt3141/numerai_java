@@ -12,21 +12,13 @@ import smile.data.formula.*;
 import smile.io.Write;
 import smile.io.Read;
 
-import smile.data.type.*;
-import smile.data.formula.Terms.*;
-import ml.dmlc.xgboost4j.java.Booster;
-
-import ml.dmlc.xgboost4j.java.XGBoost;
-
-import scala.collection.Iterator;
-
 import java.io.*;
 import java.util.*;
 import java.util.stream.*;
-import java.io.*;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Example {
 
@@ -43,13 +35,14 @@ public class Example {
     static ReadData readData = new ReadData();
 
     public static void main(String[] args) {
+        Logger logger = LoggerFactory.getLogger(Example.class);
         try {
-            System.out.println("Start training");
+            logger.info("Start training");
             RegressionValidations<GradientTreeBoost> trainedRegressors = train();
 
             writeModel(trainedRegressors, "GBT_regressor.model");
 
-            System.out.println(trainedRegressors);
+            logger.info(trainedRegressors.toString());
 
             DataFrame liveDataFrame = readDataFrame(liveFile);
 
