@@ -21,6 +21,13 @@
             <version>1.7.5</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/ml.dmlc/xgboost4j-spark -->
+        <dependency>
+            <groupId>ml.dmlc</groupId>
+            <artifactId>xgboost4j-spark_2.12</artifactId>
+            <version>1.7.5</version>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.github.haifengl/smile-core -->
         <dependency>
             <groupId>com.github.haifengl</groupId>
