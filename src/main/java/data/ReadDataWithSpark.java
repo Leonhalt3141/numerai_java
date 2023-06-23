@@ -2,6 +2,7 @@ package data;
 
 import java.io.*;
 
+import org.apache.avro.Schema;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.spark.ml.feature.StringIndexerModel;
 import org.apache.spark.sql.Row;
@@ -20,6 +21,7 @@ import org.apache.spark.sql.types.*;
 
 import java.util.*;
 
+import data.ReadData;
 
 import static org.apache.parquet.avro.AvroParquetReader.builder;
 
@@ -27,7 +29,7 @@ import static org.apache.parquet.avro.AvroParquetReader.builder;
 public class ReadDataWithSpark {
 
 
-    StructType createSchema(String filePath) {
+    public static StructType createSchema(String filePath) {
 
         List<StructField> fieldList = new ArrayList<>();
 
@@ -56,6 +58,33 @@ public class ReadDataWithSpark {
         return new StructType((StructField[]) fieldList.toArray());
     }
 
+    public static StructType getSchema(String parquetPath) throws IOException {
+        ReadData readData = new ReadData();
+        ParquetReader<GenericRecord> reader = readData.readAsIterator(parquetPath);
+
+        GenericRecord data = reader.read();
+        Schema schema = data.getSchema();
+
+        List<StructField> structFieldList = new ArrayList<>();
+        List<Schema.Field> fieldList = schema.getFields();
+
+        for (Schema.Field field : fieldList) {
+            DataType dataType;
+
+            if (field.name().contains("feature")) {
+                dataType = DataTypes.DoubleType;
+            } else if (field.name().contains("target")) {
+                dataType = DataTypes.DoubleType;
+            } else {
+                dataType = DataTypes.StringType;
+            }
+
+            structFieldList.add(new StructField(field.name(), dataType, true, Metadata.empty()));
+        }
+
+        return new StructType((StructField[]) structFieldList.toArray());
+    }
+
     public ParquetReader<GenericRecord> buildParquetReader(String filePath) throws IOException {
         Configuration conf = new Configuration();
 
@@ -81,9 +110,20 @@ public class ReadDataWithSpark {
         return recordMap;
     }
 
-    public Dataset<Row> convertToInputVector(StructType schema, String outputCol, String[] inputNames, String outputName, String csvPath) {
+    public static String[] getInputNames(StructType schema) {
+        List<String> fieldList = new ArrayList<>();
+
+        for (String field : schema.fieldNames()) {
+            if (field.contains("feature_")) {
+                fieldList.add(field);
+            }
+        }
+        return fieldList.toArray(new String[0]);
+    }
+
+    public static Dataset<Row> convertToInputVector(StructType schema, String outputCol, String[] inputNames, String outputName, String parquetPath) {
         SparkSession spark = SparkSession.builder().getOrCreate();
-        Dataset<Row> rawInput = spark.read().schema(schema).csv(csvPath);
+        Dataset<Row> rawInput = spark.read().schema(schema).parquet(parquetPath);
 
         StringIndexerModel stringIndexer = new StringIndexer()
                 .setInputCols(inputNames)
