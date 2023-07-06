@@ -55,7 +55,7 @@ public class ReadDataWithSpark {
             e.printStackTrace();
         }
 
-        return new StructType((StructField[]) fieldList.toArray());
+        return new StructType(fieldList.toArray(new StructField[0]));
     }
 
     public static StructType getSchema(String parquetPath) throws IOException {
@@ -82,7 +82,7 @@ public class ReadDataWithSpark {
             structFieldList.add(new StructField(field.name(), dataType, true, Metadata.empty()));
         }
 
-        return new StructType((StructField[]) structFieldList.toArray());
+        return new StructType(structFieldList.toArray(new StructField[0]));
     }
 
     public ParquetReader<GenericRecord> buildParquetReader(String filePath) throws IOException {
@@ -122,7 +122,12 @@ public class ReadDataWithSpark {
     }
 
     public static Dataset<Row> convertToInputVector(StructType schema, String outputCol, String[] inputNames, String outputName, String parquetPath) {
-        SparkSession spark = SparkSession.builder().getOrCreate();
+        final SparkSession spark = SparkSession
+                .builder()
+                .master("local")
+                .appName("NUMERAI")
+                .config("spark.master", "local")
+                .getOrCreate();
         Dataset<Row> rawInput = spark.read().schema(schema).parquet(parquetPath);
 
         StringIndexerModel stringIndexer = new StringIndexer()

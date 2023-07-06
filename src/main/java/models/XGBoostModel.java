@@ -17,7 +17,7 @@ import scala.collection.immutable.Map;
 
 public class XGBoostModel {
 
-    static String trainParquetPath = "";
+    static String trainParquetPath = "data/509_v4_1_train.parquet";
 
     public static void main(String[] args) throws IOException, XGBoostError {
         StructType schema = ReadDataWithSpark.getSchema(trainParquetPath);
