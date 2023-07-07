@@ -21,10 +21,6 @@ import org.apache.spark.sql.types.*;
 
 import java.util.*;
 
-import data.ReadData;
-
-import static org.apache.parquet.avro.AvroParquetReader.builder;
-
 
 public class ReadDataWithSpark {
 
@@ -72,9 +68,9 @@ public class ReadDataWithSpark {
             DataType dataType;
 
             if (field.name().contains("feature")) {
-                dataType = DataTypes.DoubleType;
+                dataType = DataTypes.FloatType;
             } else if (field.name().contains("target")) {
-                dataType = DataTypes.DoubleType;
+                dataType = DataTypes.FloatType;
             } else {
                 dataType = DataTypes.StringType;
             }
@@ -130,9 +126,15 @@ public class ReadDataWithSpark {
                 .getOrCreate();
         Dataset<Row> rawInput = spark.read().schema(schema).parquet(parquetPath);
 
+        String[] outputNames = new String[inputNames.length];
+        for (int i = 0; i < inputNames.length; i++) {
+            outputNames[i] = "x" + i;
+        }
+
         StringIndexerModel stringIndexer = new StringIndexer()
                 .setInputCols(inputNames)
-                .setOutputCol(outputName)
+//                .setOutputCol(outputName)
+                .setOutputCols(outputNames)
                 .fit(rawInput);
 
         Dataset<Row> labelTransformed = stringIndexer.transform(rawInput).drop("");

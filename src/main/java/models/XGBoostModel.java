@@ -21,9 +21,11 @@ public class XGBoostModel {
 
     public static void main(String[] args) throws IOException, XGBoostError {
         StructType schema = ReadDataWithSpark.getSchema(trainParquetPath);
+
         String[] inputNames = ReadDataWithSpark.getInputNames(schema);
 
-        Dataset<Row> inputVector = ReadDataWithSpark.convertToInputVector(schema, "output", inputNames, "target", trainParquetPath);
+        Dataset<Row> inputVector = ReadDataWithSpark
+                .convertToInputVector(schema, "output", inputNames, "target", trainParquetPath);
 
         Map<String, Object> param = generateXGBParam(20, "multi:softprob", 100, 2);
 
