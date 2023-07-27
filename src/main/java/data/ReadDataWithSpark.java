@@ -128,20 +128,26 @@ public class ReadDataWithSpark {
 
         String[] outputNames = new String[inputNames.length];
         for (int i = 0; i < inputNames.length; i++) {
-            outputNames[i] = "x" + i;
+            outputNames[i] = "y" + i;
         }
 
         StringIndexerModel stringIndexer = new StringIndexer()
-                .setInputCols(inputNames)
-//                .setOutputCol(outputName)
-                .setOutputCols(outputNames)
+                .setInputCol("target")
+                .setOutputCol("output")
+//                .setOutputCols(outputNames)
                 .fit(rawInput);
 
-        Dataset<Row> labelTransformed = stringIndexer.transform(rawInput).drop("");
+        Dataset<Row> labelTransformed = stringIndexer
+                .transform(rawInput)
+                .drop("era")
+                .drop("target")
+                .drop("data_type")
+                .drop("id");
+
 
         VectorAssembler vectorAssembler = new VectorAssembler().
                 setInputCols(inputNames).
-                setOutputCol(outputCol);
+                setOutputCol("features");
 
         return vectorAssembler.transform(labelTransformed).select("features", outputCol);
     }
